@@ -32,6 +32,14 @@ public class Voice : Component
 
 	[Property] public float Volume { get; set; } = 1.0f;
 	[Property] public ActivateMode Mode { get; set; }
+
+	/// <summary>
+	/// Jitter buffer depth in milliseconds. 0 = write voice straight through (default,
+	/// current behavior). Higher values trade added latency for smoother playback under
+	/// network jitter, absorbing late/bunched frames before they underrun the mixer.
+	/// </summary>
+	[Property, Range( 0, 200 )]
+	public float JitterBufferMs { get; set; } = 0f;
 	[Property, InputAction, ShowIf( nameof( Mode ), ActivateMode.PushToTalk )] public string PushToTalkInput { get; set; } = "voice";
 	[Property] public bool WorldspacePlayback { get; set; } = true;
 
@@ -62,7 +70,13 @@ public class Voice : Component
 
 	private bool recording = false;
 	private SoundStream soundStream;
+	private readonly VoiceJitterBuffer jitterBuffer = new();
 	private SoundHandle sound;
+
+	/// <summary>
+	/// Target jitter buffer cushion in samples, derived from <see cref="JitterBufferMs"/>.
+	/// </summary>
+	private int TargetSamples => (int)(JitterBufferMs / 1000f * VoiceManager.SampleRate);
 	private float[] morphs;
 
 	private static readonly string[] VisemeNames = new string[]
@@ -153,6 +167,7 @@ public class Voice : Component
 		VoiceManager.OnCompressedVoiceData += OnVoice;
 
 		soundStream = new SoundStream( VoiceManager.SampleRate );
+		jitterBuffer.Reset();
 
 		if ( Renderer.IsValid() && Renderer.Model.MorphCount > 0 )
 		{
@@ -188,6 +203,7 @@ public class Voice : Component
 		}
 		soundStream?.Dispose();
 		soundStream = null;
+		jitterBuffer.Reset();
 	}
 
 	public bool IsRecording
@@ -247,6 +263,16 @@ public class Voice : Component
 	{
 		ApplyVisemes();
 		FadeMorphs();
+
+		// Drain the jitter buffer even on frames with no incoming voice, so the gate
+		// can open once the cushion fills and released audio keeps flowing. Also drains
+		// any residual FIFO if buffering was just turned off at runtime (TargetSamples
+		// is then 0, so the gate opens immediately). No-op when nothing is queued.
+		if ( soundStream is not null && (JitterBufferMs > 0f || jitterBuffer.QueuedSamples > 0) )
+		{
+			jitterBuffer.Pump( soundStream, TargetSamples );
+		}
+
 		UpdateSound();
 
 		// Stop the sound if we haven't received voice data for a while
@@ -427,7 +453,16 @@ public class Voice : Component
 				sound.IsVoice = true;
 			}
 
-			soundStream.WriteData( samples.Span );
+			if ( JitterBufferMs <= 0f )
+			{
+				// Passthrough: identical to the un-buffered path.
+				soundStream.WriteData( samples.Span );
+			}
+			else
+			{
+				jitterBuffer.Enqueue( samples.Span );
+				jitterBuffer.Pump( soundStream, TargetSamples );
+			}
 
 			LastPlayed = 0;
 			UpdateSound();
