@@ -24,6 +24,10 @@ internal partial class ShadowMapper
 	/// another view's published cascade fit instead of computing its own.</summary>
 	bool _logBorrowed;
 
+	/// <summary>Each cascade-cache condition as the view found it, so a view that fit its own
+	/// cascades says which condition sent it there.</summary>
+	string _logGate;
+
 	/// <summary>A short stable name per mapper instance. One mapper exists per light binner, so
 	/// this is what shows that more than one is in play at all.</summary>
 	int _logId;
@@ -53,7 +57,8 @@ internal partial class ShadowMapper
 
 		var size = View.ViewportSize;
 		_logCalls.Add( $"m{_logId} {size.x:0}x{size.y:0} cascades={CascadeShadowMapCount}"
-			+ $"{( _logBorrowed ? " REUSED" : "" )}{( DirectionalShadowMemorySize == 0 ? " mem=0" : "" )}" );
+			+ $"{( _logBorrowed ? " REUSED" : $" OWN[{_logGate}]" )}"
+			+ $"{( DirectionalShadowMemorySize == 0 ? " mem=0" : "" )}" );
 	}
 
 	/// <summary>Print the collected frame if its shape differs from the last one printed, and

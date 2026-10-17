@@ -336,9 +336,21 @@ internal partial class ShadowMapper
 		float viewportArea = View.ViewportSize.x * View.ViewportSize.y;
 		var cameraPosition = View.CameraPosition;
 
-		if ( LastCascades.Frame == Application.FrameCount && LastCascades.Light == light.Key && viewportArea <= LastCascades.ViewportArea
-			&& LastCascades.ExcludedFlags == excludeFlags
-			&& cameraPosition.DistanceSquared( LastCascades.CameraPosition ) <= LastCascades.RadiusSquared )
+		// Each condition separately, so the log can say WHICH one sent a view off to fit its own
+		// cascades. Evaluating all of them costs a float distance; the branch below is unchanged.
+		bool gateFrame = LastCascades.Frame == Application.FrameCount;
+		bool gateLight = LastCascades.Light == light.Key;
+		bool gateArea = viewportArea <= LastCascades.ViewportArea;
+		bool gateFlags = LastCascades.ExcludedFlags == excludeFlags;
+		float gateDistanceSq = cameraPosition.DistanceSquared( LastCascades.CameraPosition );
+		bool gateInside = gateDistanceSq <= LastCascades.RadiusSquared;
+
+		if ( CSMLog )
+			_logGate = $"frame={( gateFrame ? 1 : 0 )} light={( gateLight ? 1 : 0 )}"
+				+ $" area={( gateArea ? 1 : 0 )} flags={( gateFlags ? 1 : 0 )}"
+				+ $" d2={gateDistanceSq:0.##} r2={LastCascades.RadiusSquared:0.##}";
+
+		if ( gateFrame && gateLight && gateArea && gateFlags && gateInside )
 		{
 			_logBorrowed = true;
 			gpuShadowData = LastCascades.Data;
