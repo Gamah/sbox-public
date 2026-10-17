@@ -110,7 +110,9 @@ internal partial class ShadowMapper
 	{
 		DirectionalLight = sceneObject;
 		UseNativeView( view );
-		return DoDirectionalLight( FromNative( sceneObject ) );
+		var result = DoDirectionalLight( FromNative( sceneObject ) );
+		LogDirectional();
+		return result;
 	}
 
 	/// <summary>

@@ -306,6 +306,8 @@ internal partial class ShadowMapper
 		if ( !light.ShadowsEnabled )
 			return;
 
+		_logBorrowed = false;
+
 		int numCascades = Math.Min( light.Cascades, MaxCascades );
 		float farClip = CascadeDistance;
 		int shadowmapSize = MaxCascadeResolution;
@@ -338,6 +340,7 @@ internal partial class ShadowMapper
 			&& LastCascades.ExcludedFlags == excludeFlags
 			&& cameraPosition.DistanceSquared( LastCascades.CameraPosition ) <= LastCascades.RadiusSquared )
 		{
+			_logBorrowed = true;
 			gpuShadowData = LastCascades.Data;
 			gpuShadowData.ShadowMaskTextureIndex = Renderer.GetShadowMaskIndex( light.Key );
 
