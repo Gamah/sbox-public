@@ -168,9 +168,11 @@ internal partial class ShadowMapper
 	{
 		// Project frustum corners into world space from clip space
 		Span<Vector3> viewFrustumCorners = stackalloc Vector3[8];
+		float smallestW = float.MaxValue;
 		for ( int i = 0; i < 8; i++ )
 		{
 			var corner = System.Numerics.Vector4.Transform( Corners[i], invViewProj );
+			smallestW = MathF.Min( smallestW, MathF.Abs( corner.W ) );
 			viewFrustumCorners[i] = new Vector3( corner.X, corner.Y, corner.Z ) / corner.W;
 		}
 
@@ -192,6 +194,13 @@ internal partial class ShadowMapper
 		float fov = 2.0f * MathF.Atan2( (viewFrustumCorners[0] - viewFrustumCorners[1]).Length * 0.5f, cameraNearDepth ) * (180.0f / MathF.PI);
 		float farPlaneScale = CalculateFarPlaneScale( fov, diagonalRatio );
 		FarClip *= farPlaneScale;
+
+		// Every division in this fit that can produce a non-finite number, in the order it runs.
+		// The first one that is not finite is where the cascades go bad.
+		if ( CSMLog )
+			_logFit = $"w={smallestW:0.####} fwd={fwd.Length:0.##} nearD={cameraNearDepth:0.##}"
+				+ $" farD={cameraFarDepth:0.##} diag={diagonalRatio:0.###} fov={fov:0.#}"
+				+ $" scale={farPlaneScale:0.###} far={FarClip:0.#}";
 
 		Span<float> splitDistances = stackalloc float[numCascades];
 		CalculateSplitDistances( splitDistances, numCascades, NearClip, FarClip, lambda );
@@ -236,6 +245,9 @@ internal partial class ShadowMapper
 			for ( int l = 0; l < 8; l++ )
 				frustumRadius = Math.Max( frustumRadius, (splitFrustumCorners[l] - splitFrustumCenter).LengthSquared );
 			frustumRadius = MathF.Ceiling( MathF.Sqrt( frustumRadius ) * 16.0f ) / 16.0f;
+
+			if ( CSMLog && cascade == count - 1 )
+				_logFit += $" tN={tNear:0.###} tF={tFar:0.###} r={frustumRadius:0.#}";
 
 			// Pull the shadow camera back toward the light beyond the bounding sphere to catch
 			// off-screen casters (tall buildings, trees behind the camera, etc.)

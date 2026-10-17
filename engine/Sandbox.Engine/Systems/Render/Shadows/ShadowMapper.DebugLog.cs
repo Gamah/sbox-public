@@ -28,6 +28,11 @@ internal partial class ShadowMapper
 	/// cascades says which condition sent it there.</summary>
 	string _logGate;
 
+	/// <summary>Every division in the cascade fit that can go non-finite, in the order it runs.
+	/// Set by <see cref="GetCascades"/>, which is static and runs to completion inside the call
+	/// being logged.</summary>
+	static string _logFit;
+
 	/// <summary>A short stable name per mapper instance. One mapper exists per light binner, so
 	/// this is what shows that more than one is in play at all.</summary>
 	int _logId;
@@ -57,7 +62,7 @@ internal partial class ShadowMapper
 
 		var size = View.ViewportSize;
 		_logCalls.Add( $"m{_logId} {size.x:0}x{size.y:0} cascades={CascadeShadowMapCount}"
-			+ $"{( _logBorrowed ? " REUSED" : $" OWN[{_logGate}]" )}"
+			+ $"{( _logBorrowed ? " REUSED" : $" OWN[{_logGate}] FIT[{_logFit}]" )}"
 			+ $"{( DirectionalShadowMemorySize == 0 ? " mem=0" : "" )}" );
 	}
 
